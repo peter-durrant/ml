@@ -1,48 +1,72 @@
-"""Program to generate the Hénon map time series and plot the data"""
-import sys
-import matplotlib.pyplot as plt
+# %%
 import numpy as np
-# get the projection='3d' to work
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-del Axes3D
 
-# Hénon map equation:
-# x(t) = 1 - ax(t-1)^2 + bx(t-2)
 
-def generate(a, b, numpoints):
-    """Generate the Hénon map time series (1D) and return the number of requested points"""
-    data = [0]*numpoints
+def Henon(x_t_minus_1, x_t_minus_2, a, b):
+    # Hénon map equation:
+    # x(t) = 1 - ax(t-1)^2 + bx(t-2)
+    x_t = 1 - a * x_t_minus_1 ** 2 + b * x_t_minus_2
+    return x_t
 
-    for i in range(3, numpoints):
-        data[i] = 1 - (a * data[i - 1]*data[i - 1]) + (b * data[i - 2])
 
+def GenerateHenon(a, b, count):
+    series = []
+    x_t_minus_2 = Henon(0, 0, a, b)
+    x_t_minus_1 = Henon(x_t_minus_2, 0, a, b)
+    for i in range(count):
+        x = Henon(x_t_minus_1, x_t_minus_2, a, b)
+        series.append(x)
+        x_t_minus_2 = x_t_minus_1
+        x_t_minus_1 = x
+    return series
+
+
+def Embed(series, dimension):
+    data = []
+    for d in range(dimension, 0, -1):
+        data.append(series.shift(d - 1))
+    data = np.delete(data, list(range(dimension)), axis=1)
+    data = pd.DataFrame(data).transpose()
+    data = data.rename(columns=CreateEmbedLabels(data, dimension))
     return data
 
-def embed(data):
-    """Turn a 1D series into a 3D embedding and return the series(t), series(t-1), series(t-2)"""
-    data_lag0 = data[:-2]
-    data_lag1 = np.roll(data, -1)[:-2].flatten()
-    data_lag2 = np.roll(data, -2)[:-2].flatten()
-    return data_lag0, data_lag1, data_lag2
 
-def plot(embeddeddata):
-    """Plot a 3D embedding"""
-    figure = plt.figure()
-    ax = figure.add_subplot(111, projection='3d')
-    ax.set_xlabel('t')
-    ax.set_ylabel('t-1')
-    ax.set_zlabel('t-2')
-    ax.set_title('Hénon Map')
+def CreateEmbedLabels(data, dimension):
+    labels = {}
+    for i in range(0, dimension, 1):
+        labels[i] = 'x_'
+        if i != dimension - 1:
+            labels[i] += f'{{t-{dimension - i - 1}}}'
+        else:
+            labels[i] += f'{{t}}'
+    return labels
 
-    ax.plot3D(embeddeddata[0], embeddeddata[1], embeddeddata[2], ',')
-
-    plt.show()
 
 def main():
-    """Generate the time series, embed it into 3D, plot the attractor on a 3D scatter plot"""
-    timeseriesdata = generate(1.4, 0.3, 10000)
-    embeddeddata = embed(timeseriesdata)
-    plot(embeddeddata)
+    series = GenerateHenon(1.4, 0.3, 1000)
 
-if __name__ == '__main__':
-    sys.exit(main())
+    embeddedSeries = Embed(pd.Series(series), 3)
+
+    sns.pairplot(embeddedSeries, diag_kind='kde')
+    plt.show()
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.scatter(
+        embeddedSeries[embeddedSeries.columns[0]],
+        embeddedSeries[embeddedSeries.columns[1]],
+        embeddedSeries[embeddedSeries.columns[2]])
+    ax.set_xlabel(f'${embeddedSeries.columns[0]}$')
+    ax.set_ylabel(f'${embeddedSeries.columns[1]}$')
+    ax.set_zlabel(f'${embeddedSeries.columns[2]}$')
+    plt.show()
+
+
+if __name__ == "__main__":
+    main()
+
+# %%
